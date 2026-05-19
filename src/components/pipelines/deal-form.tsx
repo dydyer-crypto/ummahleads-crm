@@ -60,6 +60,7 @@ export function DealForm({
   const [assignedTo, setAssignedTo] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [referredByCode, setReferredByCode] = useState("");
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -89,6 +90,7 @@ export function DealForm({
       setAssignedTo(deal.assigned_to ?? "");
       setExpectedCloseDate(deal.expected_close_date ?? "");
       setNotes(deal.notes ?? "");
+      setReferredByCode(deal.referred_by_code ?? "");
     } else {
       setTitle("");
       setValue("");
@@ -98,6 +100,7 @@ export function DealForm({
       setAssignedTo("");
       setExpectedCloseDate("");
       setNotes("");
+      setReferredByCode("");
     }
   }, [open, deal, defaultStageId, stages]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -163,6 +166,7 @@ export function DealForm({
       assigned_to: assignedTo || null,
       notes: notes.trim() || null,
       expected_close_date: expectedCloseDate || null,
+      referred_by_code: referredByCode.trim() || null,
     };
 
     if (deal) {
@@ -361,6 +365,19 @@ export function DealForm({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add notes..."
                 className="min-h-[100px] border-slate-700 bg-slate-800 text-white"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-slate-300">
+                Referred by{" "}
+                <span className="font-normal text-slate-500">(ref code)</span>
+              </Label>
+              <Input
+                value={referredByCode}
+                onChange={(e) => setReferredByCode(e.target.value)}
+                placeholder="agent-ref-code"
+                className="border-slate-700 bg-slate-800 font-mono text-white"
               />
             </div>
 

@@ -213,9 +213,29 @@ export default function PipelinesPage() {
       if (error) {
         toast.error("Failed to move deal");
         refreshDeals();
+        return;
+      }
+
+      // Auto-commission: when a deal with a referral code moves to "Signé"
+      const newStage = stages.find((s) => s.id === newStageId);
+      if (newStage?.name === "Signé") {
+        const deal = deals.find((d) => d.id === dealId);
+        if (deal?.referred_by_code) {
+          fetch("/api/referrals/commission", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              deal_id: dealId,
+              ref_code: deal.referred_by_code,
+              deal_value: deal.value ?? 0,
+              deal_title: deal.title,
+            }),
+          }).catch(() => {});
+          toast.success("Commission recorded for referral!");
+        }
       }
     },
-    [supabase, refreshDeals],
+    [supabase, refreshDeals, stages, deals],
   );
 
   const handleAddDeal = useCallback(

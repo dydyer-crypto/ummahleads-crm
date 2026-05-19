@@ -154,6 +154,7 @@ export interface Deal {
   notes?: string;
   expected_close_date?: string;
   status?: DealStatus;
+  referred_by_code?: string;
   created_at: string;
   updated_at?: string;
   contact?: Contact;

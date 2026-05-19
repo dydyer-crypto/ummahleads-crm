@@ -1,91 +1,106 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Get the user's link id
-  const { data: link } = await supabase
-    .from("referral_links")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
+  // Get all of the user's links
+  const { data: links } = await supabase
+    .from("referral_links").select("id, ref_code").eq("user_id", user.id);
 
-  if (!link) {
-    // No link yet — return zeroes
+  if (!links || links.length === 0) {
     return NextResponse.json({
-      total: 0,
-      week: 0,
-      today: 0,
-      chart: [] as { date: string; count: number }[],
+      aggregate: { total: 0, month: 0, today: 0, commissions_count: 0, commissions_amount: 0 },
+      by_link: {},
+      chart: buildEmptyChart(),
     });
   }
 
-  const linkId = link.id;
-  const now = new Date();
+  const linkIds = links.map((l) => l.id);
+  const refCodes = links.map((l) => l.ref_code);
 
-  // Start of today (UTC)
+  const now = new Date();
   const todayStart = new Date(now);
   todayStart.setUTCHours(0, 0, 0, 0);
-
-  // Start of this week (Monday UTC)
-  const weekStart = new Date(now);
-  weekStart.setUTCHours(0, 0, 0, 0);
-  const day = weekStart.getUTCDay(); // 0 = Sun
-  weekStart.setUTCDate(weekStart.getUTCDate() - ((day + 6) % 7));
-
-  // 14-day start
+  const monthStart = new Date(now);
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
   const chartStart = new Date(now);
   chartStart.setUTCDate(chartStart.getUTCDate() - 13);
   chartStart.setUTCHours(0, 0, 0, 0);
 
-  const [totalRes, weekRes, todayRes, chartRes] = await Promise.all([
-    supabase
-      .from("referral_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("link_id", linkId),
-    supabase
-      .from("referral_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("link_id", linkId)
-      .gte("clicked_at", weekStart.toISOString()),
-    supabase
-      .from("referral_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("link_id", linkId)
-      .gte("clicked_at", todayStart.toISOString()),
-    supabase
-      .from("referral_clicks")
-      .select("clicked_at")
-      .eq("link_id", linkId)
-      .gte("clicked_at", chartStart.toISOString())
-      .order("clicked_at", { ascending: true }),
-  ]);
+  const [allClicks, monthClicks, todayClicks, chartClicks, commissions] =
+    await Promise.all([
+      supabase.from("referral_clicks").select("link_id", { count: "exact", head: true })
+        .in("link_id", linkIds),
+      supabase.from("referral_clicks").select("link_id", { count: "exact", head: true })
+        .in("link_id", linkIds).gte("clicked_at", monthStart.toISOString()),
+      supabase.from("referral_clicks").select("link_id", { count: "exact", head: true })
+        .in("link_id", linkIds).gte("clicked_at", todayStart.toISOString()),
+      supabase.from("referral_clicks").select("link_id, clicked_at")
+        .in("link_id", linkIds).gte("clicked_at", chartStart.toISOString())
+        .order("clicked_at", { ascending: true }),
+      supabase.from("referral_commissions").select("commission_amount, status")
+        .in("ref_code", refCodes),
+    ]);
 
-  // Bucket clicks by day for the chart
-  const buckets: Record<string, number> = {};
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(chartStart);
-    d.setUTCDate(d.getUTCDate() + i);
-    buckets[d.toISOString().slice(0, 10)] = 0;
+  // Per-link click counts (all time)
+  const { data: perLinkRaw } = await supabase
+    .from("referral_clicks").select("link_id")
+    .in("link_id", linkIds);
+
+  const byLink: Record<string, { total: number; month: number; today: number }> = {};
+  for (const l of links) byLink[l.id] = { total: 0, month: 0, today: 0 };
+
+  for (const row of perLinkRaw ?? []) {
+    if (byLink[row.link_id]) byLink[row.link_id].total++;
   }
-  for (const row of chartRes.data ?? []) {
+  for (const row of monthClicks.data ?? []) {
+    if (byLink[row.link_id]) byLink[row.link_id].month++;
+  }
+  for (const row of todayClicks.data ?? []) {
+    if (byLink[row.link_id]) byLink[row.link_id].today++;
+  }
+
+  // 14-day aggregate chart
+  const buckets = buildEmptyChart(chartStart);
+  for (const row of chartClicks.data ?? []) {
     const day = (row.clicked_at as string).slice(0, 10);
-    if (day in buckets) buckets[day]++;
+    const b = buckets.find((b) => b.date === day);
+    if (b) b.count++;
   }
-  const chart = Object.entries(buckets).map(([date, count]) => ({
-    date,
-    count,
-  }));
+
+  const pendingCommissions = (commissions.data ?? []).filter(
+    (c) => c.status !== "cancelled",
+  );
 
   return NextResponse.json({
-    total: totalRes.count ?? 0,
-    week: weekRes.count ?? 0,
-    today: todayRes.count ?? 0,
-    chart,
+    aggregate: {
+      total: allClicks.count ?? 0,
+      month: monthClicks.count ?? 0,
+      today: todayClicks.count ?? 0,
+      commissions_count: pendingCommissions.length,
+      commissions_amount: pendingCommissions.reduce(
+        (s, c) => s + (c.commission_amount ?? 0), 0,
+      ),
+    },
+    by_link: byLink,
+    chart: buckets,
+  });
+}
+
+function buildEmptyChart(from?: Date) {
+  const start = from ?? (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 13);
+    d.setUTCHours(0, 0, 0, 0);
+    return d;
+  })();
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    return { date: d.toISOString().slice(0, 10), count: 0 };
   });
 }

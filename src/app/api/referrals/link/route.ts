@@ -5,11 +5,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://crm.ummahleads.app";
 
-// Generate a slug from the user's name, ensuring uniqueness.
-async function generateRefCode(
+function withUrl(link: Record<string, unknown>) {
+  return { ...link, link_url: `${BASE_URL}/r/${link.ref_code}` };
+}
+
+async function generateUniqueCode(
   supabase: SupabaseClient,
   userId: string,
   email?: string | null,
+  suffix?: string,
 ): Promise<string> {
   const { data: profile } = await supabase
     .from("profiles")
@@ -18,21 +22,22 @@ async function generateRefCode(
     .single();
 
   const raw =
-    profile?.full_name ??
-    email?.split("@")[0] ??
-    "agent";
-
-  const base = raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 12) || "agent";
+    profile?.full_name ?? email?.split("@")[0] ?? "agent";
+  const base =
+    (suffix
+      ? `${raw}-${suffix}`
+      : raw
+    )
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 20) || "agent";
 
   for (let i = 0; i < 10; i++) {
-    const suffix = Math.random().toString(36).slice(2, 6);
-    const code = `${base}-${suffix}`;
+    const rand = Math.random().toString(36).slice(2, 6);
+    const code = `${base}-${rand}`;
     const { data } = await supabase
       .from("referral_links")
       .select("id")
@@ -40,107 +45,67 @@ async function generateRefCode(
       .maybeSingle();
     if (!data) return code;
   }
-  // Final fallback — virtually never reached
   return `agent-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-function withLinkUrl(link: Record<string, unknown>) {
-  return { ...link, link_url: `${BASE_URL}/r/${link.ref_code}` };
-}
-
-// ─── GET — fetch (or auto-create) the caller's referral link ─────────────────
+// ─── GET — list all campaigns for the current user ────────────────────────────
 export async function GET() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: existing } = await supabase
+  const { data: links } = await supabase
     .from("referral_links")
     .select("*")
     .eq("user_id", user.id)
-    .single();
+    .order("created_at", { ascending: true });
 
-  if (existing) return NextResponse.json(withLinkUrl(existing));
+  if (!links || links.length === 0) {
+    // Auto-create default campaign on first visit
+    const ref_code = await generateUniqueCode(supabase, user.id, user.email);
+    const { data: created } = await supabase
+      .from("referral_links")
+      .insert({ user_id: user.id, ref_code, campaign_name: "Default" })
+      .select()
+      .single();
+    return NextResponse.json(created ? [withUrl(created)] : [], { status: 201 });
+  }
 
-  // First visit — create the link
-  const ref_code = await generateRefCode(supabase, user.id, user.email);
-  const { data: created, error } = await supabase
-    .from("referral_links")
-    .insert({ user_id: user.id, ref_code })
-    .select()
-    .single();
-
-  if (error || !created)
-    return NextResponse.json({ error: "Failed to create link" }, { status: 500 });
-
-  return NextResponse.json(withLinkUrl(created), { status: 201 });
+  return NextResponse.json(links.map(withUrl));
 }
 
-// ─── PATCH — update destination_url and/or ref_code ──────────────────────────
-export async function PATCH(req: NextRequest) {
+// ─── POST — create a new campaign link ───────────────────────────────────────
+export async function POST(req: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const updates: Record<string, string> = {};
+  const campaign_name: string = body.campaign_name?.trim() || "Campaign";
 
+  let destination_url = "https://ummahleads.app";
   if (typeof body.destination_url === "string") {
-    try {
-      new URL(body.destination_url); // validate
-      updates.destination_url = body.destination_url;
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid destination_url" },
-        { status: 400 },
-      );
-    }
+    try { new URL(body.destination_url); destination_url = body.destination_url; }
+    catch { return NextResponse.json({ error: "Invalid URL" }, { status: 400 }); }
   }
 
-  if (typeof body.ref_code === "string") {
-    const clean = body.ref_code
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .replace(/(^-|-$)/g, "")
-      .slice(0, 30);
-    if (clean.length < 3)
-      return NextResponse.json(
-        { error: "ref_code too short (min 3 chars)" },
-        { status: 400 },
-      );
-    // Check uniqueness
-    const { data: conflict } = await supabase
-      .from("referral_links")
-      .select("id")
-      .eq("ref_code", clean)
-      .neq("user_id", user.id)
-      .maybeSingle();
-    if (conflict)
-      return NextResponse.json(
-        { error: "That code is already taken" },
-        { status: 409 },
-      );
-    updates.ref_code = clean;
-  }
+  // Slugify campaign name as code suffix
+  const slug = campaign_name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 12);
 
-  if (Object.keys(updates).length === 0)
-    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  const ref_code = await generateUniqueCode(supabase, user.id, user.email, slug);
 
-  updates.updated_at = new Date().toISOString();
-
-  const { data: updated, error } = await supabase
+  const { data, error } = await supabase
     .from("referral_links")
-    .update(updates)
-    .eq("user_id", user.id)
+    .insert({ user_id: user.id, ref_code, campaign_name, destination_url })
     .select()
     .single();
 
-  if (error || !updated)
-    return NextResponse.json({ error: "Update failed" }, { status: 500 });
-
-  return NextResponse.json(withLinkUrl(updated));
+  if (error || !data) return NextResponse.json({ error: "Failed" }, { status: 500 });
+  return NextResponse.json(withUrl(data), { status: 201 });
 }

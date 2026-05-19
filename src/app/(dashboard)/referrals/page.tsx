@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Link2,
   Copy,
@@ -16,6 +17,12 @@ import {
   TrendingUp,
   X,
   Download,
+  Plus,
+  Trophy,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +32,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -33,16 +41,28 @@ import { toast } from "sonner";
 interface ReferralLink {
   id: string;
   ref_code: string;
+  campaign_name: string;
   destination_url: string;
-  click_count: number;
+  is_active: boolean;
   created_at: string;
   link_url: string;
 }
 
-interface Stats {
+interface LinkStat {
   total: number;
-  week: number;
+  month: number;
   today: number;
+}
+
+interface StatsResponse {
+  aggregate: {
+    total: number;
+    month: number;
+    today: number;
+    commissions_count: number;
+    commissions_amount: number;
+  };
+  by_link: Record<string, LinkStat>;
   chart: { date: string; count: number }[];
 }
 
@@ -61,14 +81,14 @@ const TEMPLATES = [
     label: "Property",
     icon: "🏡",
     message: (url: string) =>
-      `Assalamu Alaikum!\n\nI found some great halal real estate opportunities on UmmahLeads that might interest you 🏡\n\n✅ Off-market deals in 57 OIC countries\n✅ Sharia-compliant financing options\n✅ AI-powered property matching\n\nCreate your free account here:\n${url}\n\nJazakallah Khair 🤲`,
+      `Assalamu Alaikum!\n\nI found some great halal real estate opportunities on UmmahLeads 🏡\n\n✅ Off-market deals in 57 OIC countries\n✅ Sharia-compliant financing\n✅ AI-powered property matching\n\nCreate your free account:\n${url}\n\nJazakallah Khair 🤲`,
   },
   {
     id: "finance",
     label: "Financing",
     icon: "💎",
     message: (url: string) =>
-      `Assalamu Alaikum!\n\nAre you looking for halal financing for your real estate project? 💎\n\nUmmahLeads offers:\n- Murabaha & Ijara Islamic financing\n- No riba — 100% Sharia compliant\n- Available in 57 OIC countries\n\nJoin thousands of Muslim investors:\n${url}\n\nBaraka Allahu Fik`,
+      `Assalamu Alaikum!\n\nLooking for halal financing for your real estate project? 💎\n\nUmmahLeads offers Murabaha & Ijara — no riba, 100% Sharia compliant, available in 57 OCI countries.\n\n${url}\n\nBaraka Allahu Fik`,
   },
 ];
 
@@ -82,10 +102,12 @@ function MiniChart({ data }: { data: { date: string; count: number }[] }) {
   };
 
   return (
-    <div className="flex h-28 items-end gap-1">
+    <div className="flex h-24 items-end gap-0.5">
       {data.map((d) => (
-        <div key={d.date} className="group relative flex flex-1 flex-col items-center gap-1">
-          {/* Tooltip */}
+        <div
+          key={d.date}
+          className="group relative flex flex-1 flex-col items-center"
+        >
           <div className="pointer-events-none absolute bottom-full mb-1 hidden rounded bg-slate-700 px-2 py-1 text-xs text-white group-hover:block whitespace-nowrap z-10">
             {formatDate(d.date)}: {d.count}
           </div>
@@ -108,34 +130,40 @@ function MiniChart({ data }: { data: { date: string; count: number }[] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReferralsPage() {
-  const [link, setLink] = useState<ReferralLink | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [links, setLinks] = useState<ReferralLink[]>([]);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [selectedId, setSelectedId] = useState<string>("");
 
-  // Edit mode
-  const [editingCode, setEditingCode] = useState(false);
-  const [editingDest, setEditingDest] = useState(false);
-  const [newCode, setNewCode] = useState("");
+  // New campaign dialog
+  const [newOpen, setNewOpen] = useState(false);
+  const [newName, setNewName] = useState("");
   const [newDest, setNewDest] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  // QR modal
+  // Selected campaign actions
+  const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-
-  // WhatsApp composer
   const [templateId, setTemplateId] = useState("invite");
   const [message, setMessage] = useState("");
 
-  const loadLink = useCallback(async () => {
+  // Inline edit
+  const [editField, setEditField] = useState<"name" | "code" | "dest" | null>(
+    null,
+  );
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const loadLinks = useCallback(async () => {
     const res = await fetch("/api/referrals/link");
     if (!res.ok) return;
-    const data: ReferralLink = await res.json();
-    setLink(data);
-    // Init message with first template
-    const tpl = TEMPLATES[0].message(data.link_url);
-    setMessage(tpl);
-    return data;
+    const data: ReferralLink[] = await res.json();
+    setLinks(data);
+    if (data.length > 0) {
+      setSelectedId((prev) =>
+        prev && data.some((l) => l.id === prev) ? prev : data[0].id,
+      );
+    }
   }, []);
 
   const loadStats = useCallback(async () => {
@@ -147,77 +175,111 @@ export default function ReferralsPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await Promise.all([loadLink(), loadStats()]);
+      await Promise.all([loadLinks(), loadStats()]);
       setLoading(false);
     })();
-  }, [loadLink, loadStats]);
+  }, [loadLinks, loadStats]);
 
-  // Keep message in sync with template + link changes
+  const selected = links.find((l) => l.id === selectedId) ?? null;
+
+  // Sync WhatsApp message with template + selected link
   useEffect(() => {
-    if (!link) return;
+    if (!selected) return;
     const tpl = TEMPLATES.find((t) => t.id === templateId);
-    if (tpl) setMessage(tpl.message(link.link_url));
-  }, [templateId, link]);
+    if (tpl) setMessage(tpl.message(selected.link_url));
+  }, [templateId, selected]);
 
   const copyLink = async () => {
-    if (!link) return;
-    await navigator.clipboard.writeText(link.link_url);
+    if (!selected) return;
+    await navigator.clipboard.writeText(selected.link_url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast.success("Link copied!");
   };
 
-  const shareWhatsApp = () => {
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(message)}`,
-      "_blank",
-    );
-  };
-
-  const saveCode = async () => {
-    if (!newCode.trim()) return;
-    setSaving(true);
+  async function createCampaign() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    const body: Record<string, string> = { campaign_name: newName.trim() };
+    if (newDest.trim()) body.destination_url = newDest.trim();
     const res = await fetch("/api/referrals/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error ?? "Failed to create campaign");
+    } else {
+      toast.success("Campaign created!");
+      setNewName("");
+      setNewDest("");
+      setNewOpen(false);
+      await loadLinks();
+      setSelectedId(data.id);
+    }
+    setCreating(false);
+  }
+
+  async function saveEdit() {
+    if (!selected || !editField) return;
+    const fieldMap: Record<typeof editField, string> = {
+      name: "campaign_name",
+      code: "ref_code",
+      dest: "destination_url",
+    };
+    setSaving(true);
+    const res = await fetch(`/api/referrals/link/${selected.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ref_code: newCode.trim() }),
+      body: JSON.stringify({ [fieldMap[editField]]: editValue.trim() }),
     });
     const data = await res.json();
     if (!res.ok) {
       toast.error(data.error ?? "Failed to update");
     } else {
-      setLink(data);
-      setEditingCode(false);
-      toast.success("Code updated!");
+      toast.success("Updated!");
+      setEditField(null);
+      await loadLinks();
     }
     setSaving(false);
-  };
+  }
 
-  const saveDest = async () => {
-    if (!newDest.trim()) return;
-    setSaving(true);
-    const res = await fetch("/api/referrals/link", {
+  async function toggleActive(link: ReferralLink) {
+    const res = await fetch(`/api/referrals/link/${link.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ destination_url: newDest.trim() }),
+      body: JSON.stringify({ is_active: !link.is_active }),
     });
-    const data = await res.json();
     if (!res.ok) {
-      toast.error(data.error ?? "Failed to update");
+      toast.error("Failed to update");
     } else {
-      setLink(data);
-      setEditingDest(false);
-      toast.success("Destination updated!");
+      toast.success(link.is_active ? "Campaign paused" : "Campaign activated");
+      await loadLinks();
     }
-    setSaving(false);
-  };
+  }
+
+  async function deleteCampaign(id: string) {
+    const res = await fetch(`/api/referrals/link/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Failed to delete");
+      return;
+    }
+    toast.success("Campaign deleted");
+    await loadLinks();
+    setSelectedId((prev) => {
+      if (prev !== id) return prev;
+      const remaining = links.filter((l) => l.id !== id);
+      return remaining[0]?.id ?? "";
+    });
+  }
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 animate-pulse rounded bg-slate-800" />
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-800/50" />
           ))}
         </div>
@@ -226,46 +288,66 @@ export default function ReferralsPage() {
     );
   }
 
-  const qrUrl = link
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(link.link_url)}&format=png`
+  const qrUrl = selected
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(selected.link_url)}&format=png`
     : null;
+
+  const agg = stats?.aggregate;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <Link2 className="h-6 w-6 text-[#D4AF37]" />
-          Referrals
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Share your affiliate link and track every click in real time.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+            <Link2 className="h-6 w-6 text-[#D4AF37]" />
+            Referrals
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Manage your affiliate campaigns and track every click in real time.
+          </p>
+        </div>
+        <Link
+          href="/referrals/leaderboard"
+          className="flex items-center gap-2 rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-2 text-sm font-medium text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
+        >
+          <Trophy className="h-4 w-4" />
+          Leaderboard
+        </Link>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Aggregate stats */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           {
             label: "Total Clicks",
-            value: stats?.total ?? 0,
+            value: agg?.total ?? 0,
             icon: MousePointerClick,
             color: "text-[#D4AF37]",
             bg: "bg-[#D4AF37]/10",
           },
           {
-            label: "This Week",
-            value: stats?.week ?? 0,
+            label: "This Month",
+            value: agg?.month ?? 0,
             icon: Calendar,
             color: "text-blue-400",
             bg: "bg-blue-500/10",
           },
           {
             label: "Today",
-            value: stats?.today ?? 0,
+            value: agg?.today ?? 0,
             icon: TrendingUp,
             color: "text-emerald-400",
             bg: "bg-emerald-500/10",
+          },
+          {
+            label: "Commissions",
+            value: agg
+              ? `€${agg.commissions_amount.toFixed(0)} (${agg.commissions_count})`
+              : "—",
+            icon: DollarSign,
+            color: "text-violet-400",
+            bg: "bg-violet-500/10",
           },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div
@@ -276,233 +358,297 @@ export default function ReferralsPage() {
               <Icon className={`h-5 w-5 ${color}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{value}</p>
+              <p className="text-xl font-bold text-white">{value}</p>
               <p className="text-xs text-slate-400">{label}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* ── Your Link ─────────────────────────────────────── */}
-        <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Link2 className="h-4 w-4 text-[#D4AF37]" />
-            Your Affiliate Link
-          </h2>
-
-          {/* Link URL */}
-          <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5">
-            <span className="flex-1 truncate font-mono text-sm text-[#D4AF37]">
-              {link?.link_url ?? "—"}
-            </span>
-            <button
-              type="button"
-              onClick={copyLink}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
-              title="Copy link"
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setQrOpen(true)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
-              title="QR Code"
-            >
-              <QrCode className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Ref code edit */}
-          <div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-slate-500">Ref code</Label>
-              <button
-                type="button"
-                onClick={() => {
-                  setNewCode(link?.ref_code ?? "");
-                  setEditingCode(true);
-                }}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#D4AF37]"
-              >
-                <Edit3 className="h-3 w-3" />
-                Edit
-              </button>
-            </div>
-            {editingCode ? (
-              <div className="mt-1 flex gap-2">
-                <Input
-                  value={newCode}
-                  onChange={(e) => setNewCode(e.target.value)}
-                  className="h-8 border-slate-700 bg-slate-800 text-sm text-white focus-visible:border-[#D4AF37] focus-visible:ring-[#D4AF37]/20"
-                  placeholder="my-custom-code"
-                />
-                <Button
-                  size="sm"
-                  onClick={saveCode}
-                  disabled={saving}
-                  className="h-8 bg-[#D4AF37] text-xs font-semibold text-slate-950 hover:bg-[#B8960C]"
-                >
-                  {saving ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Save"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setEditingCode(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <p className="mt-1 font-mono text-sm text-slate-300">
-                {link?.ref_code}
-              </p>
-            )}
-          </div>
-
-          {/* Destination URL edit */}
-          <div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-slate-500">Destination URL</Label>
-              <button
-                type="button"
-                onClick={() => {
-                  setNewDest(link?.destination_url ?? "");
-                  setEditingDest(true);
-                }}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#D4AF37]"
-              >
-                <Edit3 className="h-3 w-3" />
-                Edit
-              </button>
-            </div>
-            {editingDest ? (
-              <div className="mt-1 flex gap-2">
-                <Input
-                  value={newDest}
-                  onChange={(e) => setNewDest(e.target.value)}
-                  className="h-8 border-slate-700 bg-slate-800 text-sm text-white focus-visible:border-[#D4AF37] focus-visible:ring-[#D4AF37]/20"
-                  placeholder="https://ummahleads.app"
-                />
-                <Button
-                  size="sm"
-                  onClick={saveDest}
-                  disabled={saving}
-                  className="h-8 bg-[#D4AF37] text-xs font-semibold text-slate-950 hover:bg-[#B8960C]"
-                >
-                  {saving ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Save"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setEditingDest(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <p className="mt-1 truncate text-sm text-slate-300">
-                {link?.destination_url}
-              </p>
-            )}
-          </div>
-
-          {/* Share buttons */}
-          <div className="flex gap-2 pt-1">
-            <Button
-              onClick={copyLink}
-              variant="outline"
-              className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800"
-            >
-              {copied ? (
-                <Check className="mr-2 h-4 w-4 text-emerald-400" />
-              ) : (
-                <Copy className="mr-2 h-4 w-4" />
-              )}
-              {copied ? "Copied!" : "Copy Link"}
-            </Button>
-            <Button
-              onClick={() => setQrOpen(true)}
-              variant="outline"
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
-            >
-              <QrCode className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={() => window.open(link?.link_url, "_blank")}
-              variant="outline"
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* ── WhatsApp Composer ─────────────────────────────── */}
-        <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <MessageCircle className="h-4 w-4 text-emerald-400" />
-            WhatsApp Message
-          </h2>
-
-          {/* Template picker */}
-          <div className="flex gap-2">
-            {TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTemplateId(t.id)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  templateId === t.id
-                    ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37]"
-                    : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300"
-                }`}
-              >
-                <span>{t.icon}</span>
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Editable message */}
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={9}
-            className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/20"
-          />
-
+      {/* Campaigns table */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+          <h2 className="text-sm font-semibold text-white">Campaigns</h2>
           <Button
-            onClick={shareWhatsApp}
-            className="w-full bg-emerald-600 font-semibold text-white hover:bg-emerald-500"
+            size="sm"
+            onClick={() => setNewOpen(true)}
+            className="h-7 bg-[#D4AF37] text-xs font-semibold text-slate-950 hover:bg-[#B8960C]"
           >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Send via WhatsApp
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            New Campaign
           </Button>
         </div>
+
+        {links.length === 0 ? (
+          <div className="py-10 text-center text-sm text-slate-500">
+            No campaigns yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-800/60">
+            {links.map((l) => {
+              const ls = stats?.by_link?.[l.id];
+              const isSelected = l.id === selectedId;
+              return (
+                <div
+                  key={l.id}
+                  onClick={() => setSelectedId(l.id)}
+                  className={`flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors ${
+                    isSelected
+                      ? "bg-[#D4AF37]/5"
+                      : "hover:bg-slate-800/40"
+                  }`}
+                >
+                  {/* Active dot */}
+                  <div
+                    className={`h-2 w-2 shrink-0 rounded-full ${
+                      l.is_active ? "bg-emerald-400" : "bg-slate-600"
+                    }`}
+                  />
+
+                  {/* Campaign name + URL */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {l.campaign_name}
+                    </p>
+                    <p className="truncate font-mono text-xs text-slate-500">
+                      {l.link_url}
+                    </p>
+                  </div>
+
+                  {/* Per-link stats */}
+                  <div className="hidden shrink-0 items-center gap-6 sm:flex">
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-white">
+                        {ls?.total ?? 0}
+                      </p>
+                      <p className="text-xs text-slate-500">All time</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-white">
+                        {ls?.month ?? 0}
+                      </p>
+                      <p className="text-xs text-slate-500">Month</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-white">
+                        {ls?.today ?? 0}
+                      </p>
+                      <p className="text-xs text-slate-500">Today</p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div
+                    className="flex shrink-0 items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(l)}
+                      className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:text-white"
+                      title={l.is_active ? "Pause" : "Activate"}
+                    >
+                      {l.is_active ? (
+                        <ToggleRight className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <ToggleLeft className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteCampaign(l.id)}
+                      className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:text-red-400"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
+      {/* Selected campaign detail */}
+      {selected && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* ── Campaign link panel ─────────────────────────── */}
+          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Link2 className="h-4 w-4 text-[#D4AF37]" />
+              {selected.campaign_name}
+            </h2>
+
+            {/* Link URL copy row */}
+            <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5">
+              <span className="flex-1 truncate font-mono text-sm text-[#D4AF37]">
+                {selected.link_url}
+              </span>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white"
+                title="Copy"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white"
+                title="QR Code"
+              >
+                <QrCode className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(selected.link_url, "_blank")}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white"
+                title="Open"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Editable fields */}
+            {(["name", "code", "dest"] as const).map((field) => {
+              const labels = {
+                name: "Campaign name",
+                code: "Ref code",
+                dest: "Destination URL",
+              };
+              const values = {
+                name: selected.campaign_name,
+                code: selected.ref_code,
+                dest: selected.destination_url,
+              };
+              return (
+                <div key={field}>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-slate-500">
+                      {labels[field]}
+                    </Label>
+                    {editField !== field && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditField(field);
+                          setEditValue(values[field]);
+                        }}
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#D4AF37]"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {editField === field ? (
+                    <div className="mt-1 flex gap-2">
+                      <Input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="h-8 border-slate-700 bg-slate-800 text-sm text-white focus-visible:border-[#D4AF37] focus-visible:ring-[#D4AF37]/20"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit();
+                          if (e.key === "Escape") setEditField(null);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={saveEdit}
+                        disabled={saving}
+                        className="h-8 bg-[#D4AF37] text-xs font-semibold text-slate-950 hover:bg-[#B8960C]"
+                      >
+                        {saving ? (
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Save"
+                        )}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => setEditField(null)}
+                        className="flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-1 truncate font-mono text-sm text-slate-300">
+                      {values[field]}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── WhatsApp Composer ─────────────────────────────── */}
+          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <MessageCircle className="h-4 w-4 text-emerald-400" />
+              WhatsApp Message
+            </h2>
+
+            <div className="flex flex-wrap gap-2">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTemplateId(t.id)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    templateId === t.id
+                      ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37]"
+                      : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300"
+                  }`}
+                >
+                  <span>{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={9}
+              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/20"
+            />
+
+            <Button
+              onClick={() =>
+                window.open(
+                  `https://wa.me/?text=${encodeURIComponent(message)}`,
+                  "_blank",
+                )
+              }
+              className="w-full bg-emerald-600 font-semibold text-white hover:bg-emerald-500"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Send via WhatsApp
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 14-day chart */}
-      {stats && stats.chart.length > 0 && (
+      {stats?.chart && stats.chart.length > 0 && (
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
           <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
             <BarChart2 className="h-4 w-4 text-[#D4AF37]" />
-            Clicks — last 14 days
+            Clicks — last 14 days (all campaigns)
           </h2>
           <MiniChart data={stats.chart} />
-          {/* X-axis labels: first + last */}
           <div className="mt-2 flex justify-between text-xs text-slate-500">
             <span>
-              {new Date(stats.chart[0].date + "T00:00:00Z").toLocaleDateString(
-                "en",
-                { month: "short", day: "numeric" },
-              )}
+              {new Date(
+                stats.chart[0].date + "T00:00:00Z",
+              ).toLocaleDateString("en", { month: "short", day: "numeric" })}
             </span>
             <span>
               {new Date(
@@ -513,11 +659,68 @@ export default function ReferralsPage() {
         </div>
       )}
 
+      {/* New Campaign dialog */}
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="sm:max-w-sm border-slate-700 bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-white">New Campaign</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Campaign Name</Label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g., Paris Meetup, LinkedIn, Dubai Expo"
+                className="border-slate-700 bg-slate-800 text-white"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createCampaign();
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-slate-300">
+                Destination URL{" "}
+                <span className="text-slate-500">(optional)</span>
+              </Label>
+              <Input
+                value={newDest}
+                onChange={(e) => setNewDest(e.target.value)}
+                placeholder="https://ummahleads.app"
+                className="border-slate-700 bg-slate-800 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNewOpen(false)}
+              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={createCampaign}
+              disabled={creating || !newName.trim()}
+              className="bg-[#D4AF37] text-slate-950 hover:bg-[#B8960C]"
+            >
+              {creating ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                "Create"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* QR Code modal */}
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
         <DialogContent className="sm:max-w-xs border-slate-700 bg-slate-900">
           <DialogHeader>
-            <DialogTitle className="text-white">QR Code</DialogTitle>
+            <DialogTitle className="text-white">
+              QR Code — {selected?.campaign_name}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-2">
             {qrUrl && (
@@ -534,7 +737,7 @@ export default function ReferralsPage() {
             )}
             <p className="text-center text-xs text-slate-400">
               Scan to open{" "}
-              <span className="text-[#D4AF37]">{link?.link_url}</span>
+              <span className="text-[#D4AF37]">{selected?.link_url}</span>
             </p>
             <div className="flex gap-2">
               <Button
