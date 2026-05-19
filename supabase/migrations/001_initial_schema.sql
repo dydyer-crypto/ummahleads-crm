@@ -264,7 +264,7 @@ CREATE POLICY "Users can manage pipeline stages" ON pipeline_stages FOR ALL
 -- ============================================================
 -- DEALS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS deals (
+CREATE TABLE IF NOT EXISTS crm_deals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
@@ -281,12 +281,12 @@ CREATE TABLE IF NOT EXISTS deals (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_deals_pipeline ON deals(pipeline_id);
-CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage_id);
+CREATE INDEX IF NOT EXISTS idx_deals_pipeline ON crm_deals(pipeline_id);
+CREATE INDEX IF NOT EXISTS idx_deals_stage ON crm_deals(stage_id);
 
-ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can manage own deals" ON deals;
-CREATE POLICY "Users can manage own deals" ON deals FOR ALL USING (auth.uid() = user_id);
+ALTER TABLE crm_deals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage own crm_deals" ON crm_deals;
+CREATE POLICY "Users can manage own crm_deals" ON crm_deals FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================================
 -- BROADCASTS
@@ -355,7 +355,7 @@ DROP TRIGGER IF EXISTS set_updated_at ON contacts;
 DROP TRIGGER IF EXISTS set_updated_at ON conversations;
 DROP TRIGGER IF EXISTS set_updated_at ON whatsapp_config;
 DROP TRIGGER IF EXISTS set_updated_at ON message_templates;
-DROP TRIGGER IF EXISTS set_updated_at ON deals;
+DROP TRIGGER IF EXISTS set_updated_at ON crm_deals;
 DROP TRIGGER IF EXISTS set_updated_at ON broadcasts;
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -363,7 +363,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUN
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON whatsapp_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON message_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON deals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON crm_deals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON broadcasts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================

@@ -167,7 +167,7 @@ export function DealForm({
 
     if (deal) {
       const { error } = await supabase
-        .from("deals")
+        .from("crm_deals")
         .update(payload)
         .eq("id", deal.id);
       if (error) {
@@ -186,7 +186,7 @@ export function DealForm({
         return;
       }
       const { error } = await supabase
-        .from("deals")
+        .from("crm_deals")
         .insert({ ...payload, user_id: user.id, status: "open" });
       if (error) {
         toast.error("Failed to create deal");
@@ -205,7 +205,7 @@ export function DealForm({
     if (!deal) return;
     setStatusAction(status);
     const { error } = await supabase
-      .from("deals")
+      .from("crm_deals")
       .update({ status })
       .eq("id", deal.id);
     setStatusAction(null);
@@ -223,7 +223,7 @@ export function DealForm({
   async function handleDelete() {
     if (!deal) return;
     setDeleting(true);
-    const { error } = await supabase.from("deals").delete().eq("id", deal.id);
+    const { error } = await supabase.from("crm_deals").delete().eq("id", deal.id);
     setDeleting(false);
     if (error) {
       toast.error("Failed to delete deal");

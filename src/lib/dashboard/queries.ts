@@ -61,7 +61,7 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
-    db.from('deals').select('value, status').eq('status', 'open'),
+    db.from('crm_deals').select('value, status').eq('status', 'open'),
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -133,7 +133,7 @@ export async function loadConversationsSeries(
 export async function loadPipelineDonut(db: DB): Promise<PipelineDonutData> {
   const [stagesRes, dealsRes] = await Promise.all([
     db.from('pipeline_stages').select('id, name, color, pipeline_id, position').order('position'),
-    db.from('deals').select('stage_id, value, status').eq('status', 'open'),
+    db.from('crm_deals').select('stage_id, value, status').eq('status', 'open'),
   ])
 
   const stages =
@@ -282,7 +282,7 @@ export async function loadActivity(db: DB, limit = 20): Promise<ActivityItem[]> 
       .order('created_at', { ascending: false })
       .limit(10),
     db
-      .from('deals')
+      .from('crm_deals')
       .select('id, title, updated_at, stage:pipeline_stages(name)')
       .order('updated_at', { ascending: false })
       .limit(10),

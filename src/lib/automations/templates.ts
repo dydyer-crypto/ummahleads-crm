@@ -32,19 +32,14 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
   welcome_message: {
     slug: 'welcome_message',
     name: 'Welcome Message',
-    description: 'Auto-reply to first-time contacts with a greeting.',
-    // first_inbound_message (added in PR #33) catches both brand-new
-    // contacts AND manually-added/imported contacts on their first-ever
-    // reply, which is what a user setting up a "welcome" automation
-    // almost always wants. new_contact_created would miss the
-    // manually-imported case.
+    description: 'Auto-reply to first-time contacts with an Islamic greeting.',
     trigger_type: 'first_inbound_message',
     trigger_config: {},
     steps: [
       {
         step_type: 'send_message',
         step_config: {
-          text: "Hi! 👋 Thanks for reaching out. We'll get back to you shortly.",
+          text: "Assalamu Alaikum 👋 Thank you for contacting UmmahLeads! Our team will get back to you shortly. Insh'Allah.",
         },
       },
       {
@@ -71,7 +66,7 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
         step_type: 'send_message',
         step_config: {
           text:
-            "Thanks for your message! Our team is offline right now (9am–6pm) and will reply first thing tomorrow.",
+            "Thank you for your message! Our advisors are available 9am–6pm and will reply first thing tomorrow. Baraka Allahu Fik 🤲",
         },
         parent_index: 0,
         branch: 'yes',
@@ -80,11 +75,11 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
   },
   lead_qualifier: {
     slug: 'lead_qualifier',
-    name: 'Lead Qualifier',
-    description: 'Ask qualification questions to filter inbound leads.',
+    name: 'Real Estate Lead Qualifier',
+    description: 'Ask qualification questions to filter inbound property leads.',
     trigger_type: 'keyword_match',
     trigger_config: {
-      keywords: ['pricing', 'quote', 'buy'],
+      keywords: ['price', 'buy', 'sell', 'apartment', 'house', 'land', 'invest', 'property'],
       match_type: 'contains',
     },
     steps: [
@@ -92,7 +87,7 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
         step_type: 'send_message',
         step_config: {
           text:
-            "Great — happy to help with pricing! Quick question: roughly how many seats are you looking for?",
+            "Great — happy to help! Quick question: what city and approximate budget are you working with? 🏠",
         },
       },
       {
@@ -107,7 +102,7 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
   },
   follow_up_reminder: {
     slug: 'follow_up_reminder',
-    name: 'Follow-up Reminder',
+    name: '24h Follow-up',
     description: 'Send a nudge if a contact has not replied within 24 hours.',
     trigger_type: 'new_message_received',
     trigger_config: {},
@@ -120,7 +115,7 @@ export const AUTOMATION_TEMPLATES: Record<TemplateSlug, AutomationTemplateDefini
         step_type: 'send_message',
         step_config: {
           text:
-            "Just circling back — did you have any other questions for us? Happy to help!",
+            "Just checking in — any other questions about your real estate project? We're here to help 🤝",
         },
       },
     ],

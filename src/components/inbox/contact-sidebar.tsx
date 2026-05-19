@@ -39,7 +39,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     // Fetch deals, notes, and tags in parallel
     const [dealsRes, notesRes, tagsRes] = await Promise.all([
       supabase
-        .from("deals")
+        .from("crm_deals")
         .select("*, stage:pipeline_stages(*)")
         .eq("contact_id", contact.id)
         .order("created_at", { ascending: false }),

@@ -155,7 +155,7 @@ export function ContactDetailView({
     if (!contactId) return;
     setLoadingDeals(true);
     const { data } = await supabase
-      .from('deals')
+      .from('crm_deals')
       .select('*, stage:pipeline_stages(*)')
       .eq('contact_id', contactId)
       .order('created_at', { ascending: false });

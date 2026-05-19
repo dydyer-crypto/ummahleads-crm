@@ -27,13 +27,14 @@ import { Label } from "@/components/ui/label";
 import { GitBranch, Plus, ChevronDown, Settings } from "lucide-react";
 import { toast } from "sonner";
 
-// Spec-defined seed — name and color per the product spec.
+// UmmahLeads real estate pipeline — French market stages.
 const SPEC_DEFAULT_STAGES = [
-  { name: "New Lead", color: "#3b82f6", position: 0 }, // blue
-  { name: "Qualified", color: "#eab308", position: 1 }, // yellow
-  { name: "Proposal Sent", color: "#f97316", position: 2 }, // orange
-  { name: "Negotiation", color: "#8b5cf6", position: 3 }, // purple
-  { name: "Won", color: "#22c55e", position: 4 }, // green
+  { name: "Sourcé",    color: "#6b7280", position: 0 }, // gray
+  { name: "Visité",    color: "#3b82f6", position: 1 }, // blue
+  { name: "Qualifié",  color: "#8b5cf6", position: 2 }, // purple
+  { name: "Offre",     color: "#f97316", position: 3 }, // orange
+  { name: "Compromis", color: "#06b6d4", position: 4 }, // cyan
+  { name: "Signé",     color: "#22c55e", position: 5 }, // green
 ];
 
 export default function PipelinesPage() {
@@ -87,7 +88,7 @@ export default function PipelinesPage() {
   const loadDeals = useCallback(
     async (pipelineId: string) => {
       const { data } = await supabase
-        .from("deals")
+        .from("crm_deals")
         .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*)")
         .eq("pipeline_id", pipelineId)
         .order("created_at", { ascending: false });
@@ -206,7 +207,7 @@ export default function PipelinesPage() {
         prev.map((d) => (d.id === dealId ? { ...d, stage_id: newStageId } : d)),
       );
       const { error } = await supabase
-        .from("deals")
+        .from("crm_deals")
         .update({ stage_id: newStageId })
         .eq("id", dealId);
       if (error) {
@@ -414,7 +415,7 @@ export default function PipelinesPage() {
               }}
             />
             <p className="mt-2 text-xs text-slate-400">
-              Default stages (New Lead → Won) will be created automatically.
+              Default stages (Sourcé → Signé) will be created automatically.
             </p>
           </div>
           <DialogFooter className="bg-slate-900/50 border-slate-700">

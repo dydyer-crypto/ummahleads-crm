@@ -162,7 +162,7 @@ export function PipelineSettings({
   async function handleRemoveStage(stageId: string) {
     // Refuse to delete if deals still reference the stage (FK would fail).
     const { count } = await supabase
-      .from("deals")
+      .from("crm_deals")
       .select("id", { count: "exact", head: true })
       .eq("stage_id", stageId);
     if (count && count > 0) {

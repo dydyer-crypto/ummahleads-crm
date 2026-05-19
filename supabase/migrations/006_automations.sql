@@ -82,7 +82,7 @@ CREATE POLICY "Users can manage steps of own automations" ON automation_steps FO
 --
 -- user_id is denormalized for simple RLS; contact_id is nullable so
 -- history survives contact deletion (mirrors migration 004's pattern
--- on broadcast_recipients / deals).
+-- on broadcast_recipients / crm_deals).
 -- ============================================================
 CREATE TABLE IF NOT EXISTS automation_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

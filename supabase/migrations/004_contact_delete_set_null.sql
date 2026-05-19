@@ -1,7 +1,7 @@
 -- ============================================================
 -- Allow contact deletion without wiping history.
 --
--- broadcast_recipients.contact_id and deals.contact_id were declared
+-- broadcast_recipients.contact_id and crm_deals.contact_id were declared
 -- NOT NULL REFERENCES contacts(id) with no ON DELETE action, so
 -- Postgres defaults to NO ACTION. The first time a user tried to
 -- delete a contact that had ever received a broadcast or been
@@ -43,8 +43,8 @@ ALTER TABLE broadcast_recipients
     FOREIGN KEY (contact_id) REFERENCES contacts(id)
     ON DELETE SET NULL;
 
--- ── deals.contact_id ───────────────────────────────────────────
-ALTER TABLE deals
+-- ── crm_deals.contact_id ───────────────────────────────────────────
+ALTER TABLE crm_deals
   ALTER COLUMN contact_id DROP NOT NULL;
 
 DO $$
@@ -52,14 +52,14 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'deals_contact_id_fkey'
-      AND conrelid = 'deals'::regclass
+      AND conrelid = 'crm_deals'::regclass
   ) THEN
-    ALTER TABLE deals
+    ALTER TABLE crm_deals
       DROP CONSTRAINT deals_contact_id_fkey;
   END IF;
 END $$;
 
-ALTER TABLE deals
+ALTER TABLE crm_deals
   ADD CONSTRAINT deals_contact_id_fkey
     FOREIGN KEY (contact_id) REFERENCES contacts(id)
     ON DELETE SET NULL;

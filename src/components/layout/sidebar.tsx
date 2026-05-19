@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   X,
+  Home,
 } from "lucide-react";
 import {
   Avatar,
@@ -111,11 +112,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-800 px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500">
-              <MessageSquare className="h-4 w-4 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#D4AF37]">
+              <Home className="h-4 w-4 text-white" />
             </div>
             <span className="text-sm font-semibold text-white">
-              CRM Template for WhatsApp
+              UmmahLeads CRM
             </span>
           </Link>
           <button
@@ -147,7 +148,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                       // Taller on mobile so fingers can hit the row reliably (≥44px).
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
                       isActive
-                        ? "bg-violet-500/10 text-violet-500"
+                        ? "bg-[#D4AF37]/10 text-[#D4AF37]"
                         : "text-slate-400 hover:bg-slate-800 hover:text-white",
                     )}
                   >
@@ -158,8 +159,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                         aria-label={`${totalUnread} unread conversation${totalUnread === 1 ? "" : "s"}`}
                         className="relative flex h-2 w-2"
                       >
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D4AF37] opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D4AF37]" />
                       </span>
                     )}
                   </Link>
@@ -180,7 +181,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
                       isActive
-                        ? "bg-violet-500/10 text-violet-500"
+                        ? "bg-[#D4AF37]/10 text-[#D4AF37]"
                         : "text-slate-400 hover:bg-slate-800 hover:text-white",
                     )}
                   >
@@ -204,7 +205,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     alt={profile.full_name ?? "Avatar"}
                   />
                 ) : null}
-                <AvatarFallback className="bg-violet-500/10 text-sm font-medium text-violet-500">
+                <AvatarFallback className="bg-[#D4AF37]/10 text-sm font-medium text-[#D4AF37]">
                   {profile?.full_name?.charAt(0)?.toUpperCase() ??
                     profile?.email?.charAt(0)?.toUpperCase() ??
                     "U"}

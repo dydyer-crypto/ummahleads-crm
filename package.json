@@ -1,17 +1,17 @@
 {
-  "name": "wacrm",
-  "version": "0.1.0",
+  "name": "ummahleads-crm",
+  "version": "1.0.0",
   "private": true,
-  "description": "Self-hostable CRM template for WhatsApp built on Next.js and Supabase — shared inbox, contacts, sales pipelines, broadcasts, and no-code automations.",
+  "description": "UmmahLeads CRM — WhatsApp CRM for halal real estate. Shared inbox, contacts, pipelines, broadcasts, automations. Powered by Next.js + Supabase.",
   "license": "MIT",
-  "author": "Arnas Donauskas",
-  "homepage": "https://github.com/ArnasDon/wacrm",
+  "author": "Quantum AIAA Ltd",
+  "homepage": "https://crm.ummahleads.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ArnasDon/wacrm.git"
+    "url": "git+https://github.com/dydyer-crypto/ummahleads-crm.git"
   },
   "bugs": {
-    "url": "https://github.com/ArnasDon/wacrm/issues"
+    "url": "https://github.com/dydyer-crypto/ummahleads-crm/issues"
   },
   "keywords": [
     "crm",
