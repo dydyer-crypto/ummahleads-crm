@@ -1,22 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ArrowLeft, ChevronDown, Check } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { MessageSquare } from "lucide-react";
+  AUTH_LANGUAGES,
+  useAuthLang,
+  type AuthLangCode,
+} from "@/lib/auth-i18n";
+
+// ─── Language switcher ────────────────────────────────────────────────────────
+
+function LangPicker({
+  lang,
+  setLang,
+}: {
+  lang: AuthLangCode;
+  setLang: (l: AuthLangCode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = AUTH_LANGUAGES.find((l) => l.code === lang) ?? AUTH_LANGUAGES[0];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-lg border border-[#D4AF37]/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-[#D4AF37] backdrop-blur transition-colors hover:border-[#D4AF37]/40 hover:bg-white/10"
+      >
+        <span className="text-base leading-none">{current.flag}</span>
+        <span className="hidden sm:inline">{current.name}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute end-0 top-full z-50 mt-2 min-w-[180px] overflow-hidden rounded-xl border border-[#D4AF37]/15 bg-slate-900/95 shadow-2xl backdrop-blur-xl">
+          {AUTH_LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => {
+                setLang(l.code);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
+              style={{
+                color: l.code === lang ? "#D4AF37" : "#94A3B8",
+                background:
+                  l.code === lang ? "rgba(212,175,55,0.08)" : "transparent",
+              }}
+            >
+              <span className="text-base leading-none">{l.flag}</span>
+              <span className="flex-1 text-start">{l.name}</span>
+              {l.code === lang && (
+                <Check className="h-3.5 w-3.5 text-[#D4AF37]" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
+  const { lang, setLang, t, rtl } = useAuthLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,32 +96,65 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
     }
-
     router.push("/dashboard");
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-      <Card className="w-full max-w-md border-slate-800 bg-slate-900">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#D4AF37]/10">
-            <MessageSquare className="h-6 w-6 text-[#D4AF37]" />
-          </div>
-          <CardTitle className="text-xl text-white">Welcome back</CardTitle>
-          <CardDescription className="text-slate-400">
-            Sign in to your account
-          </CardDescription>
+    <div
+      className="relative flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4"
+      dir={rtl ? "rtl" : "ltr"}
+    >
+      {/* Background decoration */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden
+      >
+        <div className="absolute -top-40 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-[#D4AF37]/3 blur-3xl" />
+      </div>
+
+      {/* Language switcher */}
+      <div className="absolute end-4 top-4 z-10">
+        <LangPicker lang={lang} setLang={setLang} />
+      </div>
+
+      {/* Logo */}
+      <div className="relative z-10 mb-8 flex flex-col items-center gap-3">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D4AF37]/10 ring-1 ring-[#D4AF37]/20">
+          {/* Crescent moon SVG */}
+          <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-8 w-8 text-[#D4AF37]"
+            aria-hidden
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-bold tracking-tight text-[#D4AF37]">
+            UmmahLeads
+          </span>
+          <span className="rounded-md bg-[#D4AF37]/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]/70 ring-1 ring-[#D4AF37]/20">
+            CRM
+          </span>
+        </div>
+      </div>
+
+      {/* Card */}
+      <Card className="relative z-10 w-full max-w-md border-slate-800 bg-slate-900/80 backdrop-blur">
+        <CardHeader className="pb-4 text-center">
+          <h1 className="text-xl font-semibold text-white">{t.welcomeBack}</h1>
+          <p className="text-sm text-slate-400">{t.signInSubtitle}</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -65,7 +166,7 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="email" className="text-slate-300">
-                Email
+                {t.email}
               </Label>
               <Input
                 id="email"
@@ -81,19 +182,19 @@ export default function LoginPage() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-slate-300">
-                  Password
+                  {t.password}
                 </Label>
                 <Link
                   href="/forgot-password"
                   className="text-sm text-[#D4AF37] hover:text-[#D4AF37]/80"
                 >
-                  Forgot password?
+                  {t.forgotPassword}
                 </Link>
               </div>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -104,19 +205,19 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="mt-2 h-10 w-full bg-[#D4AF37] text-white hover:bg-[#B8960C] disabled:opacity-50"
+              className="mt-2 h-10 w-full bg-[#D4AF37] font-semibold text-slate-950 hover:bg-[#B8960C] disabled:opacity-50"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? t.signingIn : t.signIn}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-400">
-            Don&apos;t have an account?{" "}
+            {t.noAccount}{" "}
             <Link
               href="/signup"
-              className="text-[#D4AF37] hover:text-[#D4AF37]/80"
+              className="font-medium text-[#D4AF37] hover:text-[#D4AF37]/80"
             >
-              Create account
+              {t.createAccount}
             </Link>
           </p>
         </CardContent>
