@@ -126,11 +126,8 @@ export default function SignupPage() {
         dir={rtl ? "rtl" : "ltr"}
       >
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D4AF37]/10 ring-1 ring-[#D4AF37]/20">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8 text-[#D4AF37]" aria-hidden>
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="UmmahLeads" className="h-14 w-14 object-contain" />
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold tracking-tight text-[#D4AF37]">UmmahLeads</span>
             <span className="rounded-md bg-[#D4AF37]/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]/70 ring-1 ring-[#D4AF37]/20">CRM</span>
@@ -176,11 +173,8 @@ export default function SignupPage() {
 
       {/* Logo */}
       <div className="relative z-10 mb-8 flex flex-col items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D4AF37]/10 ring-1 ring-[#D4AF37]/20">
-          <svg viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8 text-[#D4AF37]" aria-hidden>
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="UmmahLeads" className="h-14 w-14 object-contain" />
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold tracking-tight text-[#D4AF37]">UmmahLeads</span>
           <span className="rounded-md bg-[#D4AF37]/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]/70 ring-1 ring-[#D4AF37]/20">CRM</span>
